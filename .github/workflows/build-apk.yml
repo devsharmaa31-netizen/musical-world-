@@ -20,7 +20,7 @@ jobs:
           unzip -q musical_world_starter.zip -d /tmp/mw
           PROJECT_DIR=$(find /tmp/mw -name pubspec.yaml -printf '%h\n' | head -n 1)
           if [ -z "$PROJECT_DIR" ]; then
-            echo "Flutter project not found in ZIP"
+            echo "Flutter project not found"
             exit 1
           fi
           cp -R "$PROJECT_DIR"/. .
@@ -33,6 +33,10 @@ jobs:
       - name: Create Android project
         run: flutter create . --platforms=android --org com.example --project-name musical_world
 
+      - name: Ensure Maven Central
+        run: |
+          sed -i '/repositories {/a\        mavenCentral()' android/settings.gradle.kts
+
       - name: Install dependencies
         run: flutter pub get
 
@@ -44,4 +48,3 @@ jobs:
         with:
           name: Musical-World-APK
           path: build/app/outputs/flutter-apk/app-release.apk
-
