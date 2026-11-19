@@ -12,25 +12,36 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download project
+      - name: Checkout project
         uses: actions/checkout@v4
+
+      - name: Extract project ZIP
+        run: |
+          unzip -q musical_world_starter.zip -d /tmp/mw
+          PROJECT_DIR=$(find /tmp/mw -name pubspec.yaml -printf '%h\n' | head -n 1)
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "Flutter project not found in ZIP"
+            exit 1
+          fi
+          cp -R "$PROJECT_DIR"/. .
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
 
-      - name: Create Android files
-        run: flutter create . --platforms=android --org com.example
+      - name: Create Android project
+        run: flutter create . --platforms=android --org com.example --project-name musical_world
 
-      - name: Install packages
+      - name: Install dependencies
         run: flutter pub get
 
       - name: Build APK
         run: flutter build apk --release
 
-      - name: Save APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Musical-World-APK
           path: build/app/outputs/flutter-apk/app-release.apk
+
