@@ -29,22 +29,56 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          cache: true
+
+      - name: Setup JDK 17 & Gradle Cache
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
 
       - name: Create Android project
         run: flutter create . --platforms=android --org com.example --project-name musical_world
 
-      - name: Ensure Maven Central
+      - name: Configure repositories & fallback mirror
         run: |
-          sed -i '/repositories {/a\        mavenCentral()' android/settings.gradle.kts
+          python3 - <<'EOF'
+          from pathlib import Path
+
+          path = Path("android/settings.gradle.kts")
+          if path.exists():
+              text = path.read_text(encoding="utf-8")
+              mirror = 'maven { url = uri("https://maven-central.storage-download.googleapis.com/repos/central/data/") }'
+              if mirror not in text:
+                  text = text.replace(
+                      "mavenCentral()",
+                      f"mavenCentral()\n        {mirror}",
+                  )
+              path.write_text(text, encoding="utf-8")
+          EOF
 
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Build APK
-        run: flutter build apk --release
+      - name: Build APK (with retry on 429 rate limit)
+        run: |
+          attempt=1
+          max_attempts=4
+          until flutter build apk --release --no-pub; do
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "APK build failed after $max_attempts attempts."
+              exit 1
+            fi
+            wait_sec=$((attempt * 15))
+            echo "Build failed (likely 429 rate limit). Retrying in ${wait_sec}s (${attempt}/${max_attempts})..."
+            sleep "$wait_sec"
+            attempt=$((attempt + 1))
+          done
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Musical-World-APK
           path: build/app/outputs/flutter-apk/app-release.apk
+
